@@ -41,7 +41,8 @@ MESES_MAPPING = {
 
 # Columnas a eliminar durante la limpieza inicial.
 COLUMNAS_A_ELIMINAR = [
-    'Idaccidente', 'Fecha', 'Provincia', 'region', 'Parte Nro.', 'comuna', 'Region', 
+     'Fecha', 'Provincia', 'region', 'Parte Nro.', 'comuna', 'Region', 
     'Nombre Comuna', 'Nombre Provincia', 'Región', 'Rolruta', 'Ubicacionkm', 
-    'Siniestros', 'Accdte', 'Partenro', 'Mes2', 'Frentenumero', 'Ruta', 'Ubicación km'
+    'Siniestros', 'Accdte', 'Partenro', 'Mes2', 'Frentenumero', 'Ruta', 'Ubicación km',
+    'Comuna_y'
 ]
