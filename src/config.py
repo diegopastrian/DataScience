@@ -46,3 +46,13 @@ COLUMNAS_A_ELIMINAR = [
     'Siniestros', 'Accdte', 'Partenro', 'Mes2', 'Frentenumero', 'Ruta', 'Ubicación km',
     'Comuna_y'
 ]
+
+# --- Hiperparámetros del Modelo ---
+BEST_MODEL_PARAMS = {
+    'n_estimators': 300,
+    'max_depth': 4,
+    'learning_rate': 0.03,
+    'subsample': 0.6,
+    'min_samples_split': 10,
+    'min_samples_leaf': 1,
+}

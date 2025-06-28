@@ -1,0 +1,16 @@
+# .gitignore
+
+# Entorno Virtual de Python
+venv/
+
+# Carpetas de caché de Python
+__pycache__/
+*.pyc
+
+# Archivos de configuración de IDEs
+.vscode/
+.idea/
+
+# Archivos de sistema operativo
+.DS_Store
+Thumbs.db
