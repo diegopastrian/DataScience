@@ -68,7 +68,7 @@ def group_and_aggregate_data(df: pd.DataFrame, features: list, target: str) -> p
     agg_dict = {feat: "mean" for feat in features if feat in df.columns}
     agg_dict["Idaccidente"] = "count" 
 
-    df_grouped = df.groupby(["comuna", "año"]).agg(agg_dict).reset_index()
+    df_grouped = df.groupby(["comuna", "año", "Mes"], as_index=False).agg(agg_dict)
     
     # Renombrar la columna de conteo para que sea la variable objetivo
     df_grouped.rename(columns={"Idaccidente": target}, inplace=True)

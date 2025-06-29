@@ -60,16 +60,37 @@ def main():
     parser.add_argument(
         'pipeline', 
         type=str, 
-        choices=['train', 'predict'],
-        help="Elige el pipeline a ejecutar: 'train' para entrenar o 'predict' para predecir."
+        choices=['train', 'predict', 'metrics'],
+        help="Elige el pipeline a ejecutar: 'train' para entrenar, 'predict' para predecir, 'metrics' para ver métricas."
     )
     
     args = parser.parse_args()
     
     if args.pipeline == 'train':
         run_training_pipeline()
+        show_model_metrics()
     elif args.pipeline == 'predict':
         run_prediction_pipeline()
+        show_model_metrics()
+
+# === FUNCIÓN PARA MOSTRAR MÉTRICAS ===
+def show_model_metrics():
+    from src.data_processing import load_dataset, clean_data, group_and_aggregate_data
+    from src.feature_engineering import create_domain_features
+    from src.model_training import metrics_model
+    from src.config import TRAIN_DATA_PATH, FEATURES_TO_USE, TARGET_VARIABLE
+
+    df = load_dataset(TRAIN_DATA_PATH)
+    df_clean = clean_data(df)
+    df_feat = create_domain_features(df_clean)
+    df_grouped = group_and_aggregate_data(df_feat, FEATURES_TO_USE, TARGET_VARIABLE)
+    X = df_grouped[FEATURES_TO_USE]
+    y = df_grouped[TARGET_VARIABLE]
+
+    metrics = metrics_model(X, y)
+    print("\n=== MÉTRICAS DEL MODELO (Validación Cruzada) ===")
+    for k, v in metrics.items():
+        print(f"{k:12}: {v:.4f}" if isinstance(v, float) else f"{k:12}: {v}")
 
 if __name__ == "__main__":
     main()

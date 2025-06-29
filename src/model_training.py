@@ -9,6 +9,13 @@ import os
 
 from src.config import FEATURES_TO_USE, TARGET_VARIABLE, BEST_MODEL_PARAMS, MODEL_OUTPUT_PATH
 
+# === MÉTRICAS DE VALIDACIÓN CRUZADA ===
+from sklearn.model_selection import cross_val_predict, KFold
+from sklearn.metrics import (
+    r2_score, mean_absolute_error, mean_squared_error,
+    median_absolute_error, max_error
+)
+
 def train_model(df_grouped: pd.DataFrame):
     """
     Entrena un modelo de Gradient Boosting con los hiperparámetros óptimos
@@ -52,3 +59,29 @@ def train_model(df_grouped: pd.DataFrame):
     joblib.dump(model_pipeline, MODEL_OUTPUT_PATH)
     
     print(f"✅ Modelo y pipeline de preprocesamiento guardados exitosamente en: {MODEL_OUTPUT_PATH}")
+
+    #Calcula métricas de validación cruzada para el modelo de regresión.
+def metrics_model(X, y, model=None, n_splits=5):
+
+  
+    if model is None:
+        model = GradientBoostingRegressor(**BEST_MODEL_PARAMS)
+    y_log = np.log1p(y)
+    kf = KFold(n_splits=n_splits, shuffle=True, random_state=42)
+    y_pred_log = cross_val_predict(model, X, y_log, cv=kf, n_jobs=-1)
+    y_pred = np.expm1(y_pred_log)
+    metrics = {
+        "R²": r2_score(y, y_pred),
+        "MAE": mean_absolute_error(y, y_pred),
+        "MSE": mean_squared_error(y, y_pred),
+        "RMSE": np.sqrt(mean_squared_error(y, y_pred)),
+        "MedAE": median_absolute_error(y, y_pred),
+        "Max Error": max_error(y, y_pred),
+    }
+    mask = y > 100
+    if np.any(mask):
+        mape = np.mean(np.abs((y[mask] - y_pred[mask]) / y[mask])) * 100
+        metrics["MAPE (>100)"] = mape
+    else:
+        metrics["MAPE (>100)"] = None
+    return metrics
