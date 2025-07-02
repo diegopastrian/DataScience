@@ -15,6 +15,7 @@ from sklearn.metrics import (
     r2_score, mean_absolute_error, mean_squared_error,
     median_absolute_error, max_error
 )
+from sklearn.model_selection import learning_curve, validation_curve
 
 def train_model(df_grouped: pd.DataFrame):
     """
@@ -60,7 +61,65 @@ def train_model(df_grouped: pd.DataFrame):
     
     print(f"✅ Modelo y pipeline de preprocesamiento guardados exitosamente en: {MODEL_OUTPUT_PATH}")
 
-    #Calcula métricas de validación cruzada para el modelo de regresión.
+    # Guardar curva de aprendizaje (learning curve)
+    train_sizes = np.linspace(0.05, 1.0, 50)
+    X_train = df_grouped[features]
+    y_train = df_grouped[TARGET_VARIABLE]
+    y_train_log = np.log1p(y_train)
+    train_sizes, train_scores, valid_scores = learning_curve(
+        estimator=final_model,
+        X=X_train,
+        y=y_train_log,
+        train_sizes=train_sizes,
+        cv=5,
+        scoring="neg_root_mean_squared_error",
+        n_jobs=-1
+    )
+    train_mean = -np.mean(train_scores, axis=1)
+    train_std = np.std(train_scores, axis=1)
+    valid_mean = -np.mean(valid_scores, axis=1)
+    valid_std = np.std(valid_scores, axis=1)
+    df_curve = pd.DataFrame({
+        "train_size": train_sizes,
+        "train_mean": train_mean,
+        "train_std": train_std,
+        "valid_mean": valid_mean,
+        "valid_std": valid_std
+    })
+    df_curve.to_csv("models/gb_learning_curve.csv", index=False)
+
+    # Guardar curva de validación (validation curve)
+    param_range = [0.01, 0.03, 0.05, 0.07, 0.1, 0.2, 0.3]
+    train_scores, val_scores = validation_curve(
+        GradientBoostingRegressor(
+            n_estimators=100,
+            max_depth=7,
+            subsample=0.8,
+            random_state=42
+        ),
+        X_train,
+        y_train_log,
+        param_name="learning_rate",
+        param_range=param_range,
+        scoring="neg_mean_squared_error",
+        cv=5,
+        n_jobs=-1
+    )
+    train_rmse = np.sqrt(-train_scores)
+    val_rmse = np.sqrt(-val_scores)
+    train_mean = train_rmse.mean(axis=1)
+    val_mean = val_rmse.mean(axis=1)
+    train_std = train_rmse.std(axis=1)
+    val_std = val_rmse.std(axis=1)
+    df_val_curve = pd.DataFrame({
+        "learning_rate": param_range,
+        "train_mean": train_mean,
+        "train_std": train_std,
+        "val_mean": val_mean,
+        "val_std": val_std
+    })
+    df_val_curve.to_csv("models/gb_validation_curve.csv", index=False)
+
 def metrics_model(X, y, model=None, n_splits=5):
 
   
