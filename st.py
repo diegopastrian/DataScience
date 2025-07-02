@@ -194,19 +194,21 @@ def plot_validation_curve(df_val_curve, color_train, color_val, title):
     return fig
 
 
-def display_top5_comunas(df_pred, anio_sel, mes_nombre_sel, pred_col, color_top):
-    """Muestra el top 5 de comunas"""
+def display_top5_zonas(df_pred, anio_sel, mes_nombre_sel, pred_col, color_top):
+    """Muestra el top 5 de zonas"""
     MESES_INV = {v: k.capitalize() for k, v in MESES_MAPPING.items()}
     
     if mes_nombre_sel == "Todos":
         df_filtrado = df_pred[df_pred['año'] == anio_sel]
         top5 = df_filtrado.groupby("comuna")[pred_col].sum().reset_index().sort_values(by=pred_col, ascending=False).head(5)
-        st.subheader(f"Top 5 comunas con mayor predicción de accidentes ({anio_sel}, todo el año)")
+        top5[pred_col] = top5[pred_col].astype(int)
+        st.subheader(f"Top 5 zonas con mayor predicción de accidentes ({anio_sel}, todo el año)")
     else:
         mes_sel = [k for k, v in MESES_INV.items() if v == mes_nombre_sel][0]
         df_filtrado = df_pred[(df_pred['año'] == anio_sel) & (df_pred['Mes'] == mes_sel)]
         top5 = df_filtrado.sort_values(by=pred_col, ascending=False).head(5)
-        st.subheader(f"Top 5 comunas con mayor predicción de accidentes ({mes_nombre_sel} {anio_sel})")
+        top5[pred_col] = top5[pred_col].astype(int)
+        st.subheader(f"Top 5 zonas con mayor predicción de accidentes ({mes_nombre_sel} {anio_sel})")
     
     if top5.empty:
         st.info("No hay datos para ese mes y año.")
@@ -229,6 +231,7 @@ def display_temporal_trend(df_pred, pred_col, color_linea):
     
     st.subheader("Tendencia temporal de accidentes predichos")
     trend = df_pred.groupby(["año", "Mes"])[pred_col].sum().reset_index()
+    trend[pred_col] = trend[pred_col].astype(int)
     trend["Mes_nombre"] = trend["Mes"].map(MESES_INV)
     trend["Periodo"] = trend["año"].astype(str) + "-" + trend["Mes"].astype(str).str.zfill(2)
     
@@ -376,8 +379,8 @@ def compare_models():
     )
     st.plotly_chart(fig_comp, use_container_width=True)
     
-    # Top 5 comunas por modelo
-    st.subheader("🏆 Top 5 Comunas por Modelo")
+    # Top 5 zonas por modelo
+    st.subheader("🏆 Top 5 zonas por Modelo")
     
     anio_comp = st.selectbox("Año para comparación", sorted(models_data["Gradient Boosting"]['año'].unique()))
     
@@ -386,24 +389,26 @@ def compare_models():
     with col1:
         st.markdown("**Top 5 - Gradient Boosting**")
         gb_top5 = models_data["Gradient Boosting"][models_data["Gradient Boosting"]['año'] == anio_comp].groupby("comuna")[MODEL_CONFIG["Gradient Boosting"]["pred_col"]].sum().reset_index().sort_values(by=MODEL_CONFIG["Gradient Boosting"]["pred_col"], ascending=False).head(5)
+        gb_top5[MODEL_CONFIG["Gradient Boosting"]["pred_col"]] = gb_top5[MODEL_CONFIG["Gradient Boosting"]["pred_col"]].astype(int)
         st.dataframe(gb_top5.set_index("comuna"))
         
         fig_gb = px.bar(gb_top5, x="comuna", y=MODEL_CONFIG["Gradient Boosting"]["pred_col"],
                        color=MODEL_CONFIG["Gradient Boosting"]["pred_col"],
                        color_continuous_scale="Blues",
-                       title="GB - Top 5 Comunas")
+                       title="GB - Top 5 zonas")
         fig_gb.update_layout(template="plotly_white")
         st.plotly_chart(fig_gb, use_container_width=True)
     
     with col2:
         st.markdown("**Top 5 - XGBoost**")
         xgb_top5 = models_data["XGBoost"][models_data["XGBoost"]['año'] == anio_comp].groupby("comuna")[MODEL_CONFIG["XGBoost"]["pred_col"]].sum().reset_index().sort_values(by=MODEL_CONFIG["XGBoost"]["pred_col"], ascending=False).head(5)
+        xgb_top5[MODEL_CONFIG["XGBoost"]["pred_col"]] = xgb_top5[MODEL_CONFIG["XGBoost"]["pred_col"]].astype(int)
         st.dataframe(xgb_top5.set_index("comuna"))
         
         fig_xgb = px.bar(xgb_top5, x="comuna", y=MODEL_CONFIG["XGBoost"]["pred_col"],
                         color=MODEL_CONFIG["XGBoost"]["pred_col"],
                         color_continuous_scale="Oranges",
-                        title="XGBoost - Top 5 Comunas")
+                        title="XGBoost - Top 5 zonas")
         fig_xgb.update_layout(template="plotly_white")
         st.plotly_chart(fig_xgb, use_container_width=True)
 
@@ -480,8 +485,8 @@ def display_individual_model(modelo, config):
     # Contenido principal
     st.markdown(config["titulo"], unsafe_allow_html=True)
     
-    # Mostrar top 5 comunas
-    display_top5_comunas(df_pred, anio_sel, mes_nombre_sel, config["pred_col"], config["color_top"])
+    # Mostrar top 5 zonas
+    display_top5_zonas(df_pred, anio_sel, mes_nombre_sel, config["pred_col"], config["color_top"])
     
     # Mostrar tendencia temporal
     display_temporal_trend(df_pred, config["pred_col"], config["color_linea"])
@@ -531,7 +536,7 @@ def display_learning_curves(modelo_config, modelo):
 
 # === APLICACIÓN PRINCIPAL ===
 st.set_page_config(page_title="Predicción de Accidentes", layout="wide")
-st.title("Predicción de Accidentes por Comuna")
+st.title("Predicción de accidentes automovilísticos en Chile")
 
 # Sidebar: Selector de modelo
 st.sidebar.header("Configuración y Filtros")

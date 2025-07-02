@@ -69,19 +69,7 @@ def run_training_pipeline_xgb():
     if df_raw.empty:
         print("Finalizando pipeline: no se pudieron cargar los datos.")
         return
-    df_cleaned = clean_data(df_raw)
-    df_features = create_domain_features(df_cleaned)
-    # Paso de agregación para obtener total_accidentes
-    features_agregacion = [
-        "total_vehiculos", "poblacion", "Mes", "zona_urbana", "Muertos", "Graves", "M/Grave", "Leves", "Ilesos"
-    ]
-    df_grouped = group_and_aggregate_data(
-        df=df_features,
-        features=features_agregacion,
-        target="total_accidentes"
-    )
-    df_xgb = create_xgb_features(df_grouped)
-    train_xgb_model(df_grouped=df_xgb)
+    train_xgb_model(df=df_raw)
     print("============================================")
     print("=== PIPELINE XGBOOST FINALIZADO ===")
     print("=============================================")

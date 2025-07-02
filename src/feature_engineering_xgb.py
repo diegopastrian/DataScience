@@ -1,9 +1,8 @@
 import numpy as np
 import pandas as pd
 
-def create_xgb_features(df: pd.DataFrame) -> pd.DataFrame:
-    df_feat = df.copy()
-    cols_outliers = ["Muertos", "Graves", "M/Grave", "Leves", "Ilesos"]
+def create_xgb_features(df_grouped: pd.DataFrame) -> pd.DataFrame:
+    df_feat = df_grouped.copy()
     # --- Features básicas ---
     df_feat["veh_pob_ratio"] = df_feat["total_vehiculos"] / (df_feat["poblacion"] + 1)
     df_feat["log_poblacion"] = np.log1p(df_feat["poblacion"])
@@ -20,6 +19,10 @@ def create_xgb_features(df: pd.DataFrame) -> pd.DataFrame:
     df_feat["accidentes_rolling_mean"].fillna(df_feat["total_accidentes"].mean(), inplace=True)
     df_feat["accidentes_rolling_std"].fillna(df_feat["total_accidentes"].std(), inplace=True)
     # --- Log transform para outliers ---
+    cols_outliers = ["Muertos", "Graves", "M/Grave", "Leves", "Ilesos"]
     for col in cols_outliers:
-        df_feat[f"log_{col.lower()}" ] = np.log1p(df_feat[col])
+        df_feat[f"log_{col.lower()}"] = np.log1p(df_feat[col])
+    # --- Codificación de frecuencia de comuna (no se usa por defecto, pero se calcula) ---
+    comuna_freq = df_feat["comuna"].value_counts().to_dict()
+    df_feat["comuna_freq"] = df_feat["comuna"].map(comuna_freq).fillna(1)
     return df_feat 

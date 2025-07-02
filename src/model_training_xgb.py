@@ -3,13 +3,17 @@ import numpy as np
 from xgboost import XGBRegressor
 from sklearn.impute import SimpleImputer
 from sklearn.model_selection import TimeSeriesSplit, RandomizedSearchCV, learning_curve, validation_curve, train_test_split
-from sklearn.metrics import r2_score, mean_absolute_error, mean_squared_error
+from sklearn.metrics import r2_score, mean_absolute_error, mean_squared_error, median_absolute_error, max_error
 from sklearn.preprocessing import RobustScaler
 from sklearn.pipeline import Pipeline
 import joblib
 import os
 import json
 import xgboost as xgb
+from src.config import TEST_DATA_PATH, TARGET_VARIABLE
+from src.data_processing import load_dataset, clean_data, group_and_aggregate_data
+from src.feature_engineering_xgb import create_xgb_features
+from src.feature_engineering import create_domain_features
 
 # --- Configuración específica para XGBoost ---
 TRAIN_DATA_PATH = "data/Dataset_Train.csv"
@@ -36,18 +40,38 @@ PARAM_GRID = {
     "model__reg_alpha": [0, 0.1, 1]
 }
 
-def train_xgb_model(df_grouped: pd.DataFrame):
+def train_xgb_model(df: pd.DataFrame):
     print("Iniciando el entrenamiento del modelo XGBoost...")
-    X_train = df_grouped[FEATURES_FINAL]
-    y_train = df_grouped[TARGET_VARIABLE]
+    # --- Procesamiento igual que en el Colab ---
+    # 1. Limpieza y feature engineering
+    df["comuna"] = df["Nomcomuna"].astype(str).str.lower().str.strip()
+    df["zona_urbana"] = df["Urbano/Rural"].astype(str).str.lower().str.strip().apply(lambda x: 1 if x == "urbano" else 0)
+    meses = {
+        "enero": 1, "febrero": 2, "marzo": 3, "abril": 4, "mayo": 5, "junio": 6,
+        "julio": 7, "agosto": 8, "septiembre": 9, "octubre": 10, "noviembre": 11, "diciembre": 12
+    }
+    df["Mes"] = df["Mes"].astype(str).str.lower().map(meses).fillna(df["Mes"]).astype(float)
+    df["total_vehiculos"] = df["total_vehiculos"].fillna(df["total_vehiculos"].mean())
+    df["poblacion"] = df["poblacion"].fillna(df["poblacion"].mean())
+    for col in ["Muertos", "Graves", "M/Grave", "Leves", "Ilesos"]:
+        df[col] = df[col].fillna(df[col].median())
+    # 2. Agrupación
+    features = ["total_vehiculos", "poblacion", "zona_urbana", "Muertos", "Graves", "M/Grave", "Leves", "Ilesos"]
+    agg_dict = {col: "mean" for col in features}
+    agg_dict["Idaccidente"] = "count"
+    df_grouped = df.groupby(["comuna", "Mes", "año"]).agg(agg_dict).rename(columns={"Idaccidente": "total_accidentes"}).reset_index()
+    # 3. Feature engineering avanzado
+    df_xgb = create_xgb_features(df_grouped)
+    # 4. Selección de features finales
+    X_train = df_xgb[FEATURES_FINAL]
+    y_train = df_xgb[TARGET_VARIABLE]
     y_train_log = np.log1p(y_train)
-
+    # 5. Pipeline y entrenamiento igual que Colab
     pipeline = Pipeline([
         ("imputer", SimpleImputer(strategy="mean")),
         ("scaler", RobustScaler()),
         ("model", XGBRegressor(objective="reg:squarederror", random_state=42, n_jobs=-1))
     ])
-
     tscv = TimeSeriesSplit(n_splits=5)
     search = RandomizedSearchCV(
         pipeline,
@@ -60,10 +84,8 @@ def train_xgb_model(df_grouped: pd.DataFrame):
         random_state=42
     )
     search.fit(X_train, y_train_log)
-
     print("\n🔍 Mejores hiperparámetros encontrados:")
     print(search.best_params_)
-
     best_model = search.best_estimator_
     os.makedirs(os.path.dirname(MODEL_OUTPUT_PATH), exist_ok=True)
     model_pipeline = {
@@ -72,18 +94,37 @@ def train_xgb_model(df_grouped: pd.DataFrame):
     }
     joblib.dump(model_pipeline, MODEL_OUTPUT_PATH)
     print(f"✅ Modelo XGBoost guardado exitosamente en: {MODEL_OUTPUT_PATH}")
-
-    # Métricas de entrenamiento
-    y_train_pred = np.expm1(best_model.predict(X_train))
-    print("\nMétricas en entrenamiento:")
-    r2 = r2_score(y_train, y_train_pred)
-    mae = mean_absolute_error(y_train, y_train_pred)
-    rmse = np.sqrt(mean_squared_error(y_train, y_train_pred))
-    print(f"R2: {r2:.4f}")
-    print(f"MAE: {mae:.2f}")
-    print(f"RMSE: {rmse:.2f}")
-    # Guardar métricas en JSON
-    metrics_dict = {"R2": r2, "MAE": mae, "RMSE": rmse}
+    # --- Procesar TEST igual que en Colab ---
+    df_test = load_dataset(TEST_DATA_PATH)
+    df_test["comuna"] = df_test["Nomcomuna"].astype(str).str.lower().str.strip()
+    df_test["zona_urbana"] = df_test["Urbano/Rural"].astype(str).str.lower().str.strip().apply(lambda x: 1 if x == "urbano" else 0)
+    df_test["Mes"] = df_test["Mes"].astype(str).str.lower().map(meses).fillna(df_test["Mes"]).astype(float)
+    df_test["total_vehiculos"] = df_test["total_vehiculos"].fillna(df_test["total_vehiculos"].mean())
+    df_test["poblacion"] = df_test["poblacion"].fillna(df_test["poblacion"].mean())
+    for col in ["Muertos", "Graves", "M/Grave", "Leves", "Ilesos"]:
+        df_test[col] = df_test[col].fillna(df_test[col].median())
+    df_test_grouped = df_test.groupby(["comuna", "Mes", "año"]).agg(agg_dict).rename(columns={"Idaccidente": "total_accidentes"}).reset_index()
+    df_test_xgb = create_xgb_features(df_test_grouped)
+    X_test = df_test_xgb[FEATURES_FINAL]
+    y_test = df_test_xgb[TARGET_VARIABLE]
+    y_test_pred = np.expm1(best_model.predict(X_test))
+    r2 = r2_score(y_test, y_test_pred)
+    mae = mean_absolute_error(y_test, y_test_pred)
+    mse = mean_squared_error(y_test, y_test_pred)
+    rmse = np.sqrt(mse)
+    medae = median_absolute_error(y_test, y_test_pred)
+    maxerr = max_error(y_test, y_test_pred)
+    mask_test = y_test > 100
+    mape_test = np.mean(np.abs((y_test[mask_test] - y_test_pred[mask_test]) / y_test[mask_test])) * 100 if np.any(mask_test) else None
+    metrics_dict = {
+        "R2": r2,
+        "MAE": mae,
+        "MSE": mse,
+        "RMSE": rmse,
+        "MedAE": medae,
+        "Max Error": maxerr,
+        "MAPE (>100)": mape_test
+    }
     with open("models/xgb_metrics.json", "w") as f:
         json.dump(metrics_dict, f)
 
